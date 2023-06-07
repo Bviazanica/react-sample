@@ -1,12 +1,11 @@
 import { Input } from "baseui/input";
 import { FormControl } from "baseui/form-control";
-import { useStyletron } from "baseui";
+import { styled, useStyletron } from "baseui";
 import { Button } from "baseui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getTodoEntryList,
   createTodoEntry,
-  removeTodoEntry,
   updateTodoEntry,
 } from "../../api/todo-entry";
 import { useState } from "react";
@@ -25,16 +24,13 @@ const TodoList = () => {
     queryFn: getTodoEntryList,
   });
 
-  const { mutate: removeTodoEntryMutation } = useMutation({
-    mutationFn: async (id: number) => removeTodoEntry(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [getTodoEntryList.name] });
-    },
-  });
+  const latestIdInEntries = Math.max(...todoEntries.map(({ id }) => id), 1);
+  const [latestId, setLatestId] = useState(latestIdInEntries);
 
   const { mutate: createTodoEntryMutation } = useMutation({
-    mutationFn: async ({ id, value }: { id: number; value: string }) =>
-      createTodoEntry({ id, value }),
+    mutationFn: async ({ id, value }: { id: number; value: string }) => {
+      createTodoEntry({ id, value }), setLatestId(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [getTodoEntryList.name] });
       setInputValue("");
@@ -55,14 +51,15 @@ const TodoList = () => {
   });
 
   return (
-    <div
-      className={css({
-        padding: "2rem 0",
-      })}
-    >
+    <div>
       <FormControl
         label={() => "What do you have to do?"}
         overrides={{
+          ControlContainer: {
+            style: {
+              width: "22rem",
+            },
+          },
           Label: {
             style: {
               color: theme.colors.white,
@@ -70,14 +67,7 @@ const TodoList = () => {
           },
         }}
       >
-        <div
-          className={css({
-            padding: "1rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          })}
-        >
+        <InputWrapper>
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -87,43 +77,29 @@ const TodoList = () => {
             overrides={{
               Root: {
                 style: {
-                  margin: "0.5rem",
+                  margin: "0 0 0 0.5rem",
                 },
               },
             }}
             onClick={() =>
               createTodoEntryMutation({
-                id: todoEntries.length,
+                id: latestId + 1,
                 value: inputValue,
               })
             }
           >
             Add
           </Button>
-        </div>
+        </InputWrapper>
       </FormControl>
-      <div
-        className={css({
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
-        })}
-      >
+      <EntryWrapper>
         {todoEntries?.map(({ id, value }) => (
-          <div
-            key={id}
-            className={css({
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: "1rem",
-              justifyContent: "space-between",
-              backgroundColor: theme.colors.primary500,
-              padding: "1rem",
-              borderRadius: "1rem",
-            })}
-          >
-            <Checkbox />
+          <Entry key={id}>
+            <Checkbox
+              entryId={id}
+              setEditingEntryId={setEditingEntryId}
+              setEditingEntryValue={setEditingEntryValue}
+            />
             {editingEntryId === id && (
               <Input
                 value={editingEntryValue}
@@ -131,14 +107,7 @@ const TodoList = () => {
               />
             )}
             {editingEntryId !== id && <div>{value}</div>}
-            <div
-              className={css({
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "0.5rem",
-              })}
-            >
+            <EntryContent>
               {editingEntryId !== id && (
                 <Button
                   onClick={() => {
@@ -183,27 +152,43 @@ const TodoList = () => {
                   Confirm
                 </Button>
               )}
-              <Button
-                onClick={() => removeTodoEntryMutation(id)}
-                overrides={{
-                  Root: {
-                    style: {
-                      backgroundColor: theme.colors.negative500,
-                      ":hover": {
-                        backgroundColor: theme.colors.negative400,
-                      },
-                    },
-                  },
-                }}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
+            </EntryContent>
+          </Entry>
         ))}
-      </div>
+      </EntryWrapper>
     </div>
   );
 };
+
+const InputWrapper = styled("div", {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+});
+
+const EntryWrapper = styled("div", {
+  display: "flex",
+  flexDirection: "column",
+  gap: "1rem",
+});
+
+const Entry = styled("div", ({ $theme }) => ({
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: "1rem",
+  justifyContent: "space-between",
+  backgroundColor: $theme.colors.primary500,
+  padding: "1rem",
+  borderRadius: "1rem",
+  width: "20rem",
+}));
+
+const EntryContent = styled("div", {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "0.5rem",
+});
 
 export { TodoList };
